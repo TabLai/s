@@ -1,0 +1,177 @@
+import matplotlib
+matplotlib.use('TkAgg')
+import matplotlib as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import numpy as np
+from scipy.integrate import odeint
+import tkinter as tk
+import time
+
+window = tk.Tk()
+
+f = Figure(figsize=(5, 4), dpi=100)
+f_plot = f.add_subplot(111)
+
+# code lab
+window.title("control panel")
+window.geometry("1200x1200")
+window.configure(background='white')
+
+#將輸入的整數設定為參數a
+d = tk.Entry(window, font=("Arial",12),width=30)
+d.pack()
+ff = tk.IntVar()
+tk.Label(window, textvariable = ff, bg='green',fg='white',font=("Arial",12),width=30,height=2).pack()
+a = 1
+def g():
+    ff.set(d.get())
+    global a
+    a = int(d.get())
+    np.random.seed(1000)
+
+    # Start and end time (in milliseconds)
+    tmin = 0.0
+    tmax = 200.0
+
+    # Average potassium channel conductance per unit area (mS/cm^2)
+    gK = 36.0
+
+    # Average sodoum channel conductance per unit area (mS/cm^2)
+    gNa = 120.0
+
+    # Average leak channel conductance per unit area (mS/cm^2)
+    gL = 0.3
+
+    # Membrane capacitance per unit area (uF/cm^2)
+    Cm = 1.0
+
+    # Potassium potential (mV)
+    VK = -12.0
+
+    # Sodium potential (mV)
+    VNa = 115.0
+
+    # Leak potential (mV)
+    Vl = 10.613
+
+    # Time values
+    T = np.linspace(tmin, tmax, 100000)
+
+    # Potassium ion-channel rate functions
+
+    def alpha_n(Vm):
+        return (0.01 * (10.0 - Vm)) / (np.exp(1.0 - (0.1 * Vm)) - 1.0)
+
+    def beta_n(Vm):
+        return 0.125 * np.exp(-Vm / 80.0)
+
+    # Sodium ion-channel rate functions
+
+    def alpha_m(Vm):
+        return (0.1 * (25.0 - Vm)) / (np.exp(2.5 - (0.1 * Vm)) - 1.0)
+
+    def beta_m(Vm):
+        return 4.0 * np.exp(-Vm / 18.0)
+
+    def alpha_h(Vm):
+        return 0.07 * np.exp(-Vm / 20.0)
+
+    def beta_h(Vm):
+        return 1.0 / (np.exp(3.0 - (0.1 * Vm)) + 1.0)
+
+    # n, m, and h steady-state values
+
+    def n_inf(Vm=0.0):
+        return alpha_n(Vm) / (alpha_n(Vm) + beta_n(Vm))
+
+    def m_inf(Vm=0.0):
+        return alpha_m(Vm) / (alpha_m(Vm) + beta_m(Vm))
+
+    def h_inf(Vm=0.0):
+        return alpha_h(Vm) / (alpha_h(Vm) + beta_h(Vm))
+
+    # Input stimulus
+    def Id(t):
+        return a
+
+    # Compute derivatives
+    def compute_derivatives(y, t0):
+        dy = np.zeros((4,))
+
+        Vm = y[0]
+        n = y[1]
+        m = y[2]
+        h = y[3]
+
+        # dVm/dt
+        GK = (gK / Cm) * np.power(n, 4.0)
+        GNa = (gNa / Cm) * np.power(m, 3.0) * h
+        GL = gL / Cm
+
+        dy[0] = (Id(t0) / Cm) - (GK * (Vm - VK)) - (GNa * (Vm - VNa)) - (GL * (Vm - Vl))
+
+        # dn/dt
+        dy[1] = (alpha_n(Vm) * (1.0 - n)) - (beta_n(Vm) * n)
+
+        # dm/dt
+        dy[2] = (alpha_m(Vm) * (1.0 - m)) - (beta_m(Vm) * m)
+
+        # dh/dt
+        dy[3] = (alpha_h(Vm) * (1.0 - h)) - (beta_h(Vm) * h)
+
+        return dy
+
+    # State (Vm, n, m, h)
+    Y = np.array([0.0, n_inf(), m_inf(), h_inf()])
+
+    # Solve ODE system
+    # Vy = (Vm[t0:tmax], n[t0:tmax], m[t0:tmax], h[t0:tmax])
+    Vy = odeint(compute_derivatives, Y, T)
+    return(Vy)
+
+def draw_picture():
+    f_plot.clear()
+    x = np.linspace(0, 500, 100000)
+    y = g()[:,0]
+    tt = range(0,100000,2000)
+    for i in range(len(tt)) :
+        f_plot.clear()
+        j = range(tt[i])
+        f_plot.plot(x[j], y[j],color = "red",linewidth = 1)
+        f_plot.set_xlim(min(x),max(x))
+        f_plot.set_ylim(min(y),max(y))
+        f_plot.set_xlabel('Time (ms)')
+        f_plot.set_ylabel('Vm (mV)')
+        time.sleep(0.001)
+        canvs.draw()
+        window.update()
+
+def draw_trag():
+    f_plot.clear()
+    Vy = g()
+    tt = range(0,100000,2000)
+    for i in range(len(tt)):
+        f_plot.clear()
+        j = range(tt[i])
+        f_plot.plot(Vy[j, 0], Vy[j, 1], label='Vm - n')
+        f_plot.plot(Vy[tt[i], 0], Vy[tt[i], 1],".",color = "black")
+        f_plot.plot(Vy[j, 0], Vy[j, 2], label='Vm - m')
+        f_plot.plot(Vy[tt[i], 0], Vy[tt[i], 2],".",color = "black")        
+        f_plot.set_xlim(min(Vy[:,0]),max(Vy[:,0]))
+        #f_plot.set_ylim(min([Vy[j, 1],Vy[j, 2]]),max([Vy[j, 1],Vy[j, 2]]))
+        f_plot.set_title('Limit cycles')
+        f_plot.legend()
+        f_plot.set_title(tt[i])
+        canvs.draw()
+        time.sleep(0.001)
+        window.update()
+
+
+
+canvs = FigureCanvasTkAgg(f, window)
+canvs.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+tk.Button(window, text='potential', command=draw_picture).pack()
+tk.Button(window, text='Trajectories', command=draw_trag).pack()
+window.mainloop()
+
