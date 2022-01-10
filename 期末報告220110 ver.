@@ -1,0 +1,290 @@
+import matplotlib
+
+matplotlib.use('TkAgg')
+import matplotlib as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+import numpy as np
+from scipy.integrate import odeint
+import tkinter as tk
+import time
+
+window = tk.Tk()
+
+f = Figure(figsize=(7, 5), dpi=100)
+
+# code lab
+window.title("control panel")
+window.geometry("1200x900")
+window.configure(background='white')
+
+# 將輸入的整數設定為參數a
+e1 = tk.Frame(window)
+d = tk.Entry(e1, font=("Arial", 12))
+d.insert(0, "10")
+ff = tk.IntVar()
+tk.Label(e1, textvariable=ff, font=("Arial", 12)).pack(side=tk.RIGHT)
+tk.Label(e1, text='input intensity', font=("Arial", 12)).pack(side=tk.LEFT)
+d.pack(side=tk.LEFT)
+tk.Label(e1, text='current value', font=("Arial", 12)).pack(side=tk.RIGHT)
+e1.place(x=700, y=0)
+
+# gNa
+fna = tk.Frame(window)
+gna = tk.Entry(fna, font=("Arial", 12))
+gna.insert(0,"120")
+tk.Label(fna, text='gNa', font=("Arial", 12)).pack(side=tk.LEFT)
+gna.pack(side=tk.LEFT)
+tk.Label(fna, text='default 120', font=("Arial", 12)).pack(side=tk.RIGHT)
+fna.place(x=0, y=0)
+
+# gK
+fk = tk.Frame(window)
+gk = tk.Entry(fk, font=("Arial", 12))
+gk.insert(0,"36")
+tk.Label(fk, text='gK', font=("Arial", 12)).pack(side=tk.LEFT)
+gk.pack(side=tk.LEFT)
+tk.Label(fk, text='default 36', font=("Arial", 12)).pack(side=tk.RIGHT)
+fk.place(x=0, y=30)
+
+# gleak
+fle = tk.Frame(window)
+gle = tk.Entry(fle, font=("Arial", 12))
+gle.insert(0,"0.3")
+tk.Label(fle, text='gLeak', font=("Arial", 12)).pack(side=tk.LEFT)
+gle.pack(side=tk.LEFT)
+tk.Label(fle, text='default 0.3', font=("Arial", 12)).pack(side=tk.RIGHT)
+fle.place(x=0, y=60)
+
+# VNa
+vna = tk.Frame(window)
+vvna = tk.Entry(vna, font=("Arial", 12))
+vvna.insert(0,"115")
+tk.Label(vna, text='VNa', font=("Arial", 12)).pack(side=tk.LEFT)
+vvna.pack(side=tk.LEFT)
+tk.Label(vna, text='default 115', font=("Arial", 12)).pack(side=tk.RIGHT)
+vna.place(x=350, y=0)
+
+# VK
+vk = tk.Frame(window)
+vvk = tk.Entry(vk, font=("Arial", 12))
+vvk.insert(0,"-15")
+tk.Label(vk, text='VK', font=("Arial", 12)).pack(side=tk.LEFT)
+vvk.pack(side=tk.LEFT)
+tk.Label(vk, text='default -15', font=("Arial", 12)).pack(side=tk.RIGHT)
+vk.place(x=350, y=30)
+
+# VLeak
+vleak = tk.Frame(window)
+vvleak = tk.Entry(vleak, font=("Arial", 12))
+vvleak.insert(0,"10.613")
+tk.Label(vleak, text='VLeak', font=("Arial", 12)).pack(side=tk.LEFT)
+vvleak.pack(side=tk.LEFT)
+tk.Label(vleak, text='default 10.613', font=("Arial", 12)).pack(side=tk.RIGHT)
+vleak.place(x=350, y=60)
+
+a = 1
+b=1
+c=1
+dr=1
+er=1
+fr=1
+gr=1
+
+# 讀取數字，畫一次圖
+def g(x=120, y=36, z=0.3, q=115, w=-12, qw=10.613):
+    # 改input
+    ff.set(d.get())
+    global a
+    a = float(d.get())
+    global b,c,dr,er,fr,gr
+    b = float(gna.get())
+    c = float(gk.get())
+    dr = float(gle.get())
+    er = float(vvna.get())
+    fr = float(vvk.get())
+    gr = float(vvleak.get())
+
+    np.random.seed(1000)
+
+    # Start and end time (in milliseconds)
+    tmin = 0.0
+    tmax = 50.0
+
+    # Average potassium channel conductance per unit area (mS/cm^2)
+    gK = c
+
+    # Average sodoum channel conductance per unit area (mS/cm^2)
+    gNa = b
+
+    # Average leak channel conductance per unit area (mS/cm^2)
+    gL = dr
+
+    # Membrane capacitance per unit area (uF/cm^2)
+    Cm = 1.0
+
+    # Potassium potential (mV)
+    VK = fr
+
+    # Sodium potential (mV)
+    VNa = er
+
+    # Leak potential (mV)
+    Vl = gr
+
+    # Time values
+    T = np.linspace(tmin, tmax, 100000)
+
+    # Potassium ion-channel rate functions
+
+    def alpha_n(Vm):
+        return (0.01 * (10.0 - Vm)) / (np.exp(1.0 - (0.1 * Vm)) - 1.0)
+
+    def beta_n(Vm):
+        return 0.125 * np.exp(-Vm / 80.0)
+
+    # Sodium ion-channel rate functions
+
+    def alpha_m(Vm):
+        return (0.1 * (25.0 - Vm)) / (np.exp(2.5 - (0.1 * Vm)) - 1.0)
+
+    def beta_m(Vm):
+        return 4.0 * np.exp(-Vm / 18.0)
+
+    def alpha_h(Vm):
+        return 0.07 * np.exp(-Vm / 20.0)
+
+    def beta_h(Vm):
+        return 1.0 / (np.exp(3.0 - (0.1 * Vm)) + 1.0)
+
+    # n, m, and h steady-state values
+
+    def n_inf(Vm=0.0):
+        return alpha_n(Vm) / (alpha_n(Vm) + beta_n(Vm))
+
+    def m_inf(Vm=0.0):
+        return alpha_m(Vm) / (alpha_m(Vm) + beta_m(Vm))
+
+    def h_inf(Vm=0.0):
+        return alpha_h(Vm) / (alpha_h(Vm) + beta_h(Vm))
+
+    # Input stimulus
+    def Id(t):
+        return a
+
+    # Compute derivatives
+    def compute_derivatives(y, t0):
+        dy = np.zeros((4,))
+
+        Vm = y[0]
+        n = y[1]
+        m = y[2]
+        h = y[3]
+
+        # dVm/dt
+        GK = (gK / Cm) * np.power(n, 4.0)
+        GNa = (gNa / Cm) * np.power(m, 3.0) * h
+        GL = gL / Cm
+
+        dy[0] = (Id(t0) / Cm) - (GK * (Vm - VK)) - (GNa * (Vm - VNa)) - (GL * (Vm - Vl))
+
+        # dn/dt
+        dy[1] = (alpha_n(Vm) * (1.0 - n)) - (beta_n(Vm) * n)
+
+        # dm/dt
+        dy[2] = (alpha_m(Vm) * (1.0 - m)) - (beta_m(Vm) * m)
+
+        # dh/dt
+        dy[3] = (alpha_h(Vm) * (1.0 - h)) - (beta_h(Vm) * h)
+
+        return dy
+
+    # State (Vm, n, m, h)
+    Y = np.array([0.0, n_inf(), m_inf(), h_inf()])
+
+    # Solve ODE system
+    # Vy = (Vm[t0:tmax], n[t0:tmax], m[t0:tmax], h[t0:tmax])
+    Vy = odeint(compute_derivatives, Y, T)
+    return (Vy)
+
+
+def draw_picture():
+    f.clear()
+    f_plot = f.add_subplot(111)
+    x = np.linspace(0, 50, 100000)
+    y = g()[:, 0]
+    tt = range(0, 100000, 2000)
+    for i in range(len(tt)):
+        f_plot.clear()
+        j = range(tt[i])
+        f_plot.plot(x[j], y[j], color="red", linewidth=1)
+        f_plot.set_xlim(min(x), max(x))
+        f_plot.set_ylim(min(y), max(y))
+        f_plot.set_xlabel('Time (ms)')
+        f_plot.set_ylabel('Vm (mV)')
+        time.sleep(0.001)
+        canvs.draw()
+        window.update()
+
+
+def draw_trag():
+    f.clear()
+    f_plot = f.add_subplot(111)
+    Vy = g()
+    tt = range(0, 100000, 2000)
+    for i in range(len(tt)):
+        f_plot.clear()
+        j = range(tt[i])
+        f_plot.plot(Vy[j, 0], Vy[j, 1], label='Vm - n')
+        f_plot.plot(Vy[tt[i], 0], Vy[tt[i], 1], ".", color="black")
+        f_plot.plot(Vy[j, 0], Vy[j, 2], label='Vm - m')
+        f_plot.plot(Vy[tt[i], 0], Vy[tt[i], 2], ".", color="black")
+        f_plot.set_xlim(min(Vy[:, 0]), max(Vy[:, 0]))
+        # f_plot.set_ylim(min([Vy[j, 1],Vy[j, 2]]),max([Vy[j, 1],Vy[j, 2]]))
+        f_plot.set_title('Limit cycles')
+        f_plot.legend()
+        f_plot.set_title(tt[i])
+        canvs.draw()
+        time.sleep(0.001)
+        window.update()
+
+
+def draw_both():
+    f.clear()
+    f_plot = f.add_subplot(212)
+    g_plot = f.add_subplot(211)
+    Vy = g()
+    y = Vy[:, 0]
+    x = np.linspace(0, 50, 100000)
+    tt = range(0, 100000, 2000)
+    for i in range(len(tt)):
+        f_plot.clear()
+        g_plot.clear()
+        j = range(tt[i])
+
+        g_plot.plot(x[j], y[j], color="red", linewidth=1)
+        g_plot.set_xlim(min(x), max(x))
+        g_plot.set_ylim(min(y), max(y))
+        g_plot.set_xlabel('Time (ms)')
+        g_plot.set_ylabel('Vm (mV)')
+
+        f_plot.plot(Vy[j, 0], Vy[j, 1], label='Vm - n')
+        f_plot.plot(Vy[tt[i], 0], Vy[tt[i], 1], "o", color="black")
+        f_plot.plot(Vy[j, 0], Vy[j, 2], label='Vm - m')
+        f_plot.plot(Vy[tt[i], 0], Vy[tt[i], 2], "o", color="black")
+        f_plot.set_xlim(min(Vy[:, 0]), max(Vy[:, 0]))
+        # f_plot.set_ylim(min([Vy[j, 1],Vy[j, 2]]),max([Vy[j, 1],Vy[j, 2]]))
+        f_plot.set_title('Limit cycles')
+        f_plot.legend()
+        # f_plot.set_title(tt[i])
+        canvs.draw()
+        time.sleep(0.001)
+        window.update()
+
+
+canvs = FigureCanvasTkAgg(f, window)
+canvs.get_tk_widget().pack(side="left")
+tk.Button(window, text='potential', command=draw_picture).pack(side="bottom")
+tk.Button(window, text='Trajectories', command=draw_trag).pack(side="bottom")
+tk.Button(window, text='Both', command=draw_both).pack(side="bottom")
+window.mainloop()
