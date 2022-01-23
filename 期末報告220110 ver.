@@ -252,7 +252,7 @@ def draw_trag():
 def draw_both():
     f.clear()
     f_plot = f.add_subplot(212)
-    g_plot = f.add_subplot(211)
+    g_plot = f.add_subplot(311)
     Vy = g()
     y = Vy[:, 0]
     x = np.linspace(0, 50, 100000)
